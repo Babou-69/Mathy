@@ -22,10 +22,10 @@ function Stats() {
   const [globalData, setGlobalData] = useState({ total: 0, correct: 0 });
   const [message, setMessage] = useState("");
 
-  const pdfRef = useRef(); // 🔹 Référence à la section à exporter
+  const pdfRef = useRef(); 
 
   useEffect(() => {
-    const scores = JSON.parse(localStorage.getItem("scores")) || {};
+    const scores = JSON.parse(localStorage.getItem("scores")) || {}; // à modifier quand on pasera sur postgre
     const formatted = Object.entries(scores).map(([cat, val]) => ({
       category: cat,
       correct: val.correct,
@@ -40,7 +40,7 @@ function Stats() {
     setGlobalData({ total, correct });
   }, []);
 
-  const COLORS = [
+  const COLORS = [ // à modifier avec les couleur que Thaïs nous donne
     "#4caf50",
     "#f44336",
     "#2196f3",
@@ -58,7 +58,7 @@ function Stats() {
     setTimeout(() => setMessage(""), 3000);
   };
 
-  // ✅ Fonction d’export PDF avec page de couverture
+  // export PDF, pas sur que ce soit utile pour l'application mais utilie pour montrer nos avancement aux tuteurs
 const handleExportPDF = async () => {
   const input = pdfRef.current;
   if (!input) return;
@@ -72,12 +72,12 @@ const handleExportPDF = async () => {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const today = new Date().toLocaleDateString();
 
-  // 🔹 PAGE 1 : Couverture
+  // Couverture
   pdf.setFontSize(22);
   pdf.text("Rapport de révision", 20, 40);
 
   pdf.setFontSize(14);
-  pdf.text(`Nom : Milan`, 20, 60); // ✅ Plus tard remplacé par user.username
+  pdf.text(`Nom : Milan`, 20, 60); // à modifier par user.username quand on aura la database
   pdf.text(`Date du rapport : ${today}`, 20, 70);
 
   pdf.setFontSize(12);
@@ -87,7 +87,7 @@ const handleExportPDF = async () => {
   pdf.text("- Taux de réussite par catégorie", 25, 118);
   pdf.text("- Tableau récapitulatif", 25, 126);
 
-  // Ligne décorative
+
   pdf.setDrawColor(0);
   pdf.setLineWidth(0.5);
   pdf.line(20, 135, 190, 135);
@@ -95,10 +95,10 @@ const handleExportPDF = async () => {
   pdf.setFontSize(10);
   pdf.text("Généré automatiquement depuis ton application de révision", 20, 150);
 
-  // Saut de page
+
   pdf.addPage();
 
-  // 🔹 PAGE 2 : Graphiques + tableaux
+  // Graphiques + tableaux
   const imgProps = pdf.getImageProperties(imgData);
   const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
   pdf.addImage(imgData, "PNG", 0, 10, pageWidth, imgHeight);
@@ -118,10 +118,10 @@ const handleExportPDF = async () => {
       <h2>📊 Statistiques générales</h2>
 
       {stats.length === 0 ? (
-        <p>Aucune donnée enregistrée pour le moment.</p>
+        <p>Aucune donnée enregistrée pour le moment.</p> // peut être probleme quand on utilisera plus le local storage
       ) : (
         <>
-          {/* 🔹 SECTION À EXPORTER EN PDF */}
+          {/* SECTION À EXPORTER EN PDF */}
           <div ref={pdfRef}>
             {/* --- Graphique global --- */}
             <div style={{ width: "100%", height: 300, marginBottom: "2rem" }}>
@@ -149,7 +149,7 @@ const handleExportPDF = async () => {
               </ResponsiveContainer>
             </div>
 
-            {/* --- Graphique à barres --- */}
+            {/* --- Graphique en barres (pourcentage de réussite de l'élève, à rendre plus joli avec Figma surement) --- */}
             <div style={{ width: "100%", height: 350 }}>
               <h3>Taux de réussite par catégorie</h3>
               <ResponsiveContainer>
@@ -167,7 +167,7 @@ const handleExportPDF = async () => {
               </ResponsiveContainer>
             </div>
 
-            {/* --- Tableau récapitulatif --- */}
+            {/* Tableau récapitulatif ( pareil, Figma pour rendre ca beau) */}
             <h3 style={{ marginTop: "2rem" }}>Résumé chiffré</h3>
             <table className="score-table">
               <thead>
@@ -190,7 +190,7 @@ const handleExportPDF = async () => {
               </tbody>
             </table>
 
-            {/* --- Données globales --- */}
+            {/*  Données globales  */}
             <div style={{ marginTop: "1.5rem" }}>
               <p>
                 <strong>Total d’exercices réalisés :</strong> {globalData.total}
@@ -208,7 +208,7 @@ const handleExportPDF = async () => {
             </div>
           </div>
 
-          {/* --- Boutons d’action --- */}
+          {/* Boutons d’action */}
           <div style={{ marginTop: "2rem" }}>
             <button
               onClick={handleExportPDF}
@@ -221,10 +221,10 @@ const handleExportPDF = async () => {
                 cursor: "pointer",
                 fontSize: "1rem",
                 marginRight: "0.5rem",
-              }}
+              }} //faire un joli bouton d'export si on l'itilise
             >
-              📄 Exporter en PDF
-            </button>
+              📄 Exporter en PDF 
+            </button> 
 
             <button
               onClick={handleReset}
@@ -236,7 +236,7 @@ const handleExportPDF = async () => {
                 borderRadius: "6px",
                 cursor: "pointer",
                 fontSize: "1rem",
-              }}
+              }} // utile tant qu'on dev mais enlever pour le MVP pour pas avoir des problème avce les élèves
             >
               Réinitialiser les données
             </button>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import "../styles/Tests.css";
 
-// --- Générateurs d'exercices par catégorie ---
+//  Générateurs d'exercices par catégorie , à modifier quand on stockera des énoncées dans la database et on génèerera en python pour être sur d'avoir des résultats calculable de tête (ces exos bateaux sont généré par IA pour l'instant, ce référé aux cahier des charges pour voir ce qu'on implémentera pour le MVP)
 function generateExercise(category) {
   switch (category) {
     case "Calcul numérique": {
@@ -100,7 +100,7 @@ function Tests() {
   const [userAnswer, setUserAnswer] = useState("");
   const [feedback, setFeedback] = useState("");
   const [scores, setScores] = useState(() => {
-  // ✅ Chargement immédiat depuis localStorage au premier rendu
+  // Chargement avec localStorage, à modifier quand on aura la database 
   try {
     const saved = localStorage.getItem("scores");
     return saved ? JSON.parse(saved) : {};
@@ -109,7 +109,7 @@ function Tests() {
   }
 });
 
-  // 💾 Sauvegarde automatique des scores dès qu’ils changent
+  //  Sauvegarde des scores, attention, ici c'est localstorage, à modifier
   useEffect(() => {
     localStorage.setItem("scores", JSON.stringify(scores));
   }, [scores]);
@@ -121,7 +121,7 @@ function Tests() {
     setFeedback("");
   };
 
-  // Validation de la réponse
+  // Validation de la réponse, à modifier pour prendre plusieurs format de reponse (fraction / décimale)
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!exercise.answer) return;
@@ -150,14 +150,14 @@ function Tests() {
     });
   };
 
-  // Calcul du taux de réussite
+  // Calcul du taux de réussite pour l'afficher dans la page statistique, à modifier, il faut aussi enregistrer le jour de sauvegarde de ces données pour pouvoir afficher une progression dans le temps
   const getSuccessRate = (cat) => {
     const stat = scores[cat];
     if (!stat || stat.total === 0) return "–";
     return `${Math.round((stat.correct / stat.total) * 100)}%`;
   };
 
-  // Réinitialisation manuelle
+  // Réinitialisation manuelle, utile quand on développe mais à enlever pour le MVP
   const handleResetScores = () => {
     localStorage.removeItem("scores");
     setScores({});
@@ -198,13 +198,13 @@ function Tests() {
         {feedback && <p className="feedback">{feedback}</p>}
       </div>
 
-      {/* Tableau de scores */}
+      {/* Tableau de scores (qui pourrait n'enregistrer que les score du jour ? à voir)*/} 
       <h3 style={{ marginTop: "2rem" }}>📊 Statistiques personnelles</h3>
-      <table className="score-table">
+      <table className="score-table"> 
         <thead>
           <tr>
             <th>Catégorie</th>
-            <th>Taux de réussite</th>
+            <th>Taux de réussite</th> 
             <th>Réponses correctes</th>
             <th>Total</th>
           </tr>
@@ -225,8 +225,8 @@ function Tests() {
       </table>
 
       <button className="reset-btn" onClick={handleResetScores}>
-        🔄 Réinitialiser les scores
-      </button>
+        🔄 Réinitialiser les scores 
+      </button> 
     </div>
   );
 }

@@ -1,4 +1,5 @@
 # backend/app.py
+# il faut tout modifier avec notre serveur postgre pour relier front et back
 import os
 from flask import Flask, jsonify
 from dotenv import load_dotenv

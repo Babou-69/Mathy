@@ -1,4 +1,5 @@
 # backend/routes/scores.py
+# essai de code qui peut enregistrer les resultat, à vérifier quand tout sera relié
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from database import SessionLocal

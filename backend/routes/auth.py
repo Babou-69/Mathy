@@ -23,7 +23,7 @@ def register():
         if existing:
             return jsonify({"msg": "username already exists"}), 400
 
-        # create user, generate a fake email for internal use
+        # créé l'utilisateur et crée une adreese email fictive associé (utile si firebase utilisé au cas où)
         email = f"{username}@local.app"
         user = User(username=username, email=email, password_hash=hash_password(password))
         db.add(user)

@@ -18,7 +18,7 @@ function App() {
             <Route path="/" element={<Resume />} />
             <Route path="/flashcards" element={<Flashcards />} />
             <Route path="/tests" element={<Tests />} />
-            <Route path="/stats" element={<Stats />} /> {/* ✅ nouvelle page */}
+            <Route path="/stats" element={<Stats />} /> {/* nouvelle page */}
           </Routes>
         </main>
       </div>
