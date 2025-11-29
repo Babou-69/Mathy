@@ -1,0 +1,68 @@
+/* src/components/Navbar.css */
+
+.navbar {
+  background: var(--primary);
+  color: white;
+  padding: 0.6rem 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+}
+
+.navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-links a {
+  color: white;
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-links a:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.nav-links a.active {
+  background: rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+}
+
+/* ✅ Responsive */
+@media (max-width: 640px) {
+  .navbar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+  }
+
+  .nav-links a {
+    font-size: 0.9rem;
+    padding: 0.3rem 0.5rem;
+  }
+}

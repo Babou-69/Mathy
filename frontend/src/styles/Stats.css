@@ -1,0 +1,30 @@
+/* Graphiques et tableaux statistiques */
+.score-table {
+  width: 90%;
+  max-width: 600px;
+  border-collapse: collapse;
+  margin: 1rem auto;
+  font-size: 0.95rem;
+}
+
+.score-table th,
+.score-table td {
+  border: 1px solid #ddd;
+  padding: 0.6rem;
+  text-align: center;
+}
+
+.score-table th {
+  background-color: #f0f0f0;
+  font-weight: 600;
+}
+
+.score-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+@media (max-width: 480px) {
+  .score-table {
+    font-size: 0.8rem;
+  }
+}
