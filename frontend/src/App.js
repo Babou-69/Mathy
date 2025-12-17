@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import Flashcards from "./pages/Flashcards";
 import Resume from "./pages/Resume";
 import Tests from "./pages/Tests";
+import Login from "./pages/Login";
 import "./App.css";
 import Stats from "./pages/Stats";
 
@@ -19,6 +20,7 @@ function App() {
             <Route path="/flashcards" element={<Flashcards />} />
             <Route path="/tests" element={<Tests />} />
             <Route path="/stats" element={<Stats />} /> {/* nouvelle page */}
+            <Route path="/login" element={<Login />} />
           </Routes>
         </main>
       </div>

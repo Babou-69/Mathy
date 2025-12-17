@@ -32,6 +32,12 @@ function Navbar() {
           >
             Statistiques
           </Link>
+          <Link
+            className={loc.pathname === "/login" ? "active" : ""}
+            to="/login"
+          >
+            Login
+          </Link>
         </nav>
       </div>
     </header>
