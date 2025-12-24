@@ -1,28 +1,27 @@
-// src/pages/Tests.js
+// src/pages/Login.js
 import React, { useState } from "react";
 
 export default function Login() {
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
-  const handleSubmit = () => {
-  fetch("http://localhost:3001/save-user", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      user,
-      password,
-    }),
-  })
-    .then((res) => res.text())
-    .then((data) => console.log(data));
-};
+  const [message, setMessage] = useState("");
 
+  const handleLogin = () => {
+    fetch("http://localhost:3001/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ user, password }),
+    })
+      .then(res => res.json())
+      .then(data => setMessage(data.message))
+      .catch(() => setMessage("Erreur serveur"));
+  };
 
   return (
     <div className="container">
-      <h2>Page d'identification</h2>
+      <h2>Connexion</h2>
 
       <input
         type="text"
@@ -42,13 +41,9 @@ export default function Login() {
 
       <br /><br />
 
-      <button onClick={handleSubmit}>Soumettre</button>
+      <button onClick={handleLogin}>Se connecter</button>
 
-
-      <hr />
-
-      <p>Utilisateur : {user}</p>
-      <p>Mot de passe : {password}</p>
+      <p>{message}</p>
     </div>
   );
 }

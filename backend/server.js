@@ -1,44 +1,62 @@
-// server.js
 const express = require("express");
 const cors = require("cors");
-const sqlite3 = require("sqlite3").verbose(); // <- Ici on importe sqlite
+const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
 const PORT = 3001;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// ======= PARTIE SQLITE =======
+// ===== SQLITE =====
+const db = new sqlite3.Database("BDD1.db");
 
-// Ouvre ou crée la DB
-const db = new sqlite3.Database("users.db");
 
-// Crée la table si elle n'existe pas
-db.run(`CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user TEXT,
-  password TEXT
-)`);
-
-// POST /save-user
-app.post("/save-user", (req, res) => {
+app.post("/register", (req, res) => {
   const { user, password } = req.body;
 
-  db.run(
-    `INSERT INTO users (user, password) VALUES (?, ?)`,
-    [user, password],
-    function (err) {
-      if (err) {
-        return res.status(500).send("Erreur lors de l'écriture en DB");
+  // Vérifier si l'utilisateur existe déjà
+  db.get(
+    "SELECT * FROM users WHERE user = ?",
+    [user],
+    (err, row) => {
+      if (row) {
+        return res.status(400).json({ message: "Utilisateur déjà existant" });
       }
-      res.send("Utilisateur enregistré en DB !");
+
+      db.run(
+        "INSERT INTO Utilisateur (identifiant, mot_de_passe) VALUES (?, ?)",
+        [user, password],
+        (err) => {
+          if (err) {
+            return res.status(500).json({ message: "Erreur DB" });
+          }
+          res.json({ message: "Compte créé avec succès" });
+        }
+      );
     }
   );
 });
 
-// ======= FIN SQLITE =======
+app.post("/login", (req, res) => {
+  const { user, password } = req.body;
+
+  db.get(
+    "SELECT * FROM Utilisateur WHERE identifiant = ? AND mot_de_passe = ?",
+    [user, password],
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ message: "Erreur DB" });
+      }
+
+      if (!row) {
+        return res.status(401).json({ message: "Identifiants incorrects" });
+      }
+
+      res.json({ message: "Connexion réussie" });
+    }
+  );
+});
 
 app.listen(PORT, () => {
   console.log("Serveur lancé sur http://localhost:" + PORT);
