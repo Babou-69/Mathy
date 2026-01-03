@@ -58,6 +58,55 @@ app.post("/login", (req, res) => {
   );
 });
 
+app.get("/stats/:user", (req, res) => {
+  const user = req.params.user;
+
+  db.all(
+    `SELECT * FROM Utilisateur
+     WHERE identifiant = ?`,
+    [user],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json([]);
+      }
+      res.json(rows);
+    }
+  );
+});
+
+app.post("/save-result", (req, res) => { //Pour l'instant, ne sert à rien, mais vise à aller chercher les infos dans la BDD
+  const { user, categorie, correct } = req.body;
+
+  db.get(
+    `SELECT * FROM Utilisateur
+     WHERE identifiant = ?`,
+    [user],
+    (err, row) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Erreur DB" });
+      }
+
+      if (row) {
+        db.run(
+          `UPDATE Utilisateur
+           SET
+             nbr_exs_faits = nbr_exs_faits + 1,
+             nbr_exs_reussis = nbr_exs_reussis + ?,
+           WHERE identifiant = ?`,
+          [correct ? 1 : 0, user]
+        );
+      } else {
+        
+      }
+    }
+  );
+
+  res.json({ message: "Progression enregistrée" });
+});
+
+
 app.listen(PORT, () => {
   console.log("Serveur lancé sur http://localhost:" + PORT);
 });
