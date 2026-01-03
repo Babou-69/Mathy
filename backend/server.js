@@ -17,7 +17,7 @@ app.post("/register", (req, res) => {
 
   // Vérifier si l'utilisateur existe déjà
   db.get(
-    "SELECT * FROM users WHERE user = ?",
+    "SELECT * FROM Utilisateur WHERE identifiant = ?",
     [user],
     (err, row) => {
       if (row) {
