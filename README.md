@@ -6,6 +6,9 @@ Page du PE69A.
 
 ### Organisation du Git :
 
+Ce projet Git a pour but la création d'une application de mathématiques pour les élèves de première à l'occasion de la nouvelle epreuve de mathématiques. 
+On se concentrera sur la partie des automatismes avec de points méthodes et des corrections détaillées.
+
 #### backend: 
 
 #### frontend:
