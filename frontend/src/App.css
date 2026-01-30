@@ -2,7 +2,7 @@
 :root{
   --primary: #1976d2;
   --primary-dark: #145a9e;
-  --bg: #f5f5f5;
+  --bg: transparent;
   --card-bg: #ffffff;
 }
 
@@ -14,6 +14,17 @@ html, body, #root {
   font-family: Inter, Arial, sans-serif;
   background: var(--bg);
   color: #222;
+}
+
+/* Ajoute ça pour que le contenu ne soit pas caché sous la barre */
+body {
+  /* On décale le contenu de la largeur de la barre repliée + un peu d'espace */
+  padding-left: calc(70px + 1rem); 
+}
+
+/* Optionnel : Si tu veux que le contenu soit centré par rapport à l'espace restant */
+.container, .tests-page {
+  margin: 0 auto; 
 }
 
 .App {
