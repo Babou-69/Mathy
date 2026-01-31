@@ -7,6 +7,16 @@ import "../styles/Exercices.css";
    FONCTIONS UTILITAIRES
 ========================= */
 
+const injectVariablesInLatex = (latex, variables) => {
+  let result = latex;
+  Object.entries(variables).forEach(([v, val]) => {
+    const re = new RegExp(`\\\\var\\(${v}\\)`, "g");
+    result = result.replace(re, val);
+  });
+  return result;
+};
+
+
 // détecte {{x}} et \var(x)
 const extractVariables = (text) => {
   const vars = new Set();
@@ -22,17 +32,25 @@ const extractVariables = (text) => {
 
 // génère des valeurs aléatoires
 const generateVariables = (exo) => {
-  const vars = extractVariables(
-    (exo.enonce || "") + " " + (exo.correction || "")
-  );
-
+  const vars = extractVariables(exo.enonce + " " + (exo.correction || ""));
   const values = {};
+
+  // 1️⃣ Génération par défaut pour TOUTES les variables
   vars.forEach(v => {
-    values[v] = Math.floor(Math.random() * 90) + 10; // 10 → 99
+    values[v] = Math.floor(Math.random() * 90) + 10;
   });
+
+  // 2️⃣ Règles de cohérence (appliquées après)
+  // x ≤ y (effectifs, proportions)
+  if (values.x !== undefined && values.y !== undefined) {
+    if (values.x > values.y) {
+      [values.x, values.y] = [values.y, values.x];
+    }
+  }
 
   return values;
 };
+
 
 // remplace {{x}} et \var(x) par les valeurs
 const replaceVariables = (text, variables) => {
@@ -58,6 +76,20 @@ const evaluateExpression = (expr, variables) => {
   return Function(`return ${e}`)();
 };
 
+const isAnswerCorrect = (userValue, expectedValue) => {
+  if (isNaN(userValue) || isNaN(expectedValue)) return false;
+
+  // tolérance absolue
+  if (Math.abs(userValue - expectedValue) < 0.01) return true;
+
+  // tolérance relative (1%)
+  if (Math.abs(userValue - expectedValue) / Math.abs(expectedValue) < 0.01) {
+    return true;
+  }
+
+  return false;
+};
+
 
 /* =========================
    COMPOSANT REACT
@@ -79,6 +111,9 @@ function Exercices() {
 
   const [userAnswer, setUserAnswer] = useState("");
   const [feedback, setFeedback] = useState("");
+
+  const isCloseEnough = (a, b, tol = 0.01) =>
+  Math.abs(a - b) <= tol;
 
   /* --- Chargement catégories / automatismes --- */
   useEffect(() => {
@@ -128,10 +163,9 @@ function Exercices() {
     setVariablesGen(vars);
 
     setEnonceFinal(replaceVariables(exo.enonce, vars));
-    setCorrectionFinal(replaceVariables(exo.correction, vars));
-
-    setUserAnswer("");
+    setCorrectionFinal("");
     setFeedback("");
+    setUserAnswer("");
   };
 
   /* --- Changement exercice --- */
@@ -141,43 +175,48 @@ function Exercices() {
   };
 
   /* --- Validation réponse --- */
-  const handleSubmit = async () => {
+   const handleSubmit = async () => {
   const exo = exercicesBDD[indexExercice];
-  if (!exo || !exo.reponse_expr) {
-    setFeedback("❌ Réponse non définie");
+
+  const expr =
+    exo?.reponse_expr ||
+    exo?.reponse ||
+    exo?.expression_reponse;
+
+  if (!exo || !expr) {
+    setFeedback("❌ Correction automatique indisponible pour cet exercice");
     return;
   }
 
-  let expected;
-  try {
-    expected = evaluateExpression(exo.reponse_expr, variablesGen);
-  } catch (err) {
-    console.error("Erreur évaluation :", err);
-    setFeedback("❌ Erreur dans la réponse attendue");
-    return;
-  }
+    try {
+      const expected = evaluateExpression(exo.reponse_expr, variablesGen);
+      const userVal = parseFloat(userAnswer.replace(",", "."));
 
-  const user = parseFloat(userAnswer.replace(",", "."));
-  if (isNaN(user)) {
-    setFeedback("❌ Réponse invalide");
-    return;
-  }
+      if (isNaN(userVal)) {
+        setFeedback("❌ Réponse invalide");
+        return;
+      }
 
-  const correct = Math.abs(user - expected) < 0.01;
+      const correct = isCloseEnough(userVal, expected);
+      setFeedback(correct ? "✅ Correct !" : "❌ Incorrect");
 
-  setFeedback(
-    correct
-      ? "✅ Correct !"
-      : `❌ Incorrect. Réponse attendue ≈ ${expected}`
-  );
+      if (!correct) {
+        setCorrectionFinal(replaceVariables(exo.correction, variablesGen));
+      }
 
-  await fetch("http://localhost:3001/save-result", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ correct })
-  });
-};
+      await fetch("http://localhost:3001/save-result", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          correct
+        })
+      });
+
+    } catch (e) {
+      setFeedback("❌ Erreur dans la correction");
+    }
+  };
 
 
   return (
@@ -251,6 +290,13 @@ function Exercices() {
       {feedback && (
         <div className={`feedback-message ${feedback.startsWith("✅") ? "success" : "error"}`}>
           {feedback}
+        </div>
+      )}
+
+      {feedback.startsWith("❌") && correctionFinal && (
+        <div className="correction-box">
+          <h4>Correction détaillée</h4>
+          <MethodeContent text={correctionFinal} />
         </div>
       )}
     </div>
