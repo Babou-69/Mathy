@@ -19,15 +19,16 @@ function Navbar({ onLogout }) {
       <div className="sidebar-inner">
         {/* Logo / Brand */}
         <div className="brand">
-          <span className="brand-icon">😶‍🌫️</span>
-          <span className="brand-text">Appli Révisions</span>
+          <span className="brand-icon"></span>
+          <span className="brand-text">Mathy</span>
         </div>
 
         {/* Liens de navigation */}
         <div className="nav-links">
-          <Link to="/" className={loc.pathname === "/" ? "active" : ""}>
+         <Link  to="/methodes" className={loc.pathname === "/methodes" ? "active" : ""}
+>
             <span className="icon">🏠</span>
-            <span className="text">Résumé</span>
+            <span className="text">Méthodes</span>
           </Link>
           
           <Link to="/flashcards" className={loc.pathname === "/flashcards" ? "active" : ""}>

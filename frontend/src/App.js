@@ -72,13 +72,14 @@ function App() {
           <Routes>
             {/* Routes accessibles uniquement si connecté */}
             <Route
-              path="/"
-              element={
-                <RequireAuth>
-                  <Methode score={score} incrementScore={incrementScore} />
-                </RequireAuth>
-              }
-            />
+  path="/methodes"
+  element={
+    <RequireAuth>
+      <Methode score={score} incrementScore={incrementScore} />
+    </RequireAuth>
+  }
+/>
+
             <Route
               path="/flashcards"
               element={

@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import MethodeContent from "../components/MethodeContent";
 import "../styles/Exercices.css";
+import { useNavigate } from "react-router-dom";
+
 
 /* =========================
    FONCTIONS UTILITAIRES
@@ -76,6 +78,34 @@ const evaluateExpression = (expr, variables) => {
   return Function(`return ${e}`)();
 };
 
+// transforme une réponse utilisateur en nombre
+// accepte : 12.5 | 12,5 | 3/4 | 1,5/2
+const parseUserAnswer = (input) => {
+  if (!input) return NaN;
+
+  let s = input.trim();
+
+  // remplace virgule par point
+  s = s.replace(",", ".");
+
+  // fraction ?
+  if (s.includes("/")) {
+    const parts = s.split("/");
+    if (parts.length !== 2) return NaN;
+
+    const num = parseFloat(parts[0]);
+    const den = parseFloat(parts[1]);
+
+    if (isNaN(num) || isNaN(den) || den === 0) return NaN;
+
+    return num / den;
+  }
+
+  // nombre simple
+  return parseFloat(s);
+};
+
+
 const isAnswerCorrect = (userValue, expectedValue) => {
   if (isNaN(userValue) || isNaN(expectedValue)) return false;
 
@@ -108,12 +138,24 @@ function Exercices() {
   const [variablesGen, setVariablesGen] = useState({});
   const [enonceFinal, setEnonceFinal] = useState("");
   const [correctionFinal, setCorrectionFinal] = useState("");
+  const navigate = useNavigate();
+
 
   const [userAnswer, setUserAnswer] = useState("");
   const [feedback, setFeedback] = useState("");
 
-  const isCloseEnough = (a, b, tol = 0.01) =>
-  Math.abs(a - b) <= tol;
+  const isCloseEnough = (user, expected) => {
+  if (expected === 0) return Math.abs(user) < 0.01;
+
+  // tolérance relative 1 %
+  if (Math.abs(user - expected) / Math.abs(expected) < 0.01) return true;
+
+  // tolérance absolue minimale
+  if (Math.abs(user - expected) < 0.01) return true;
+
+  return false;
+};
+
 
   /* --- Chargement catégories / automatismes --- */
   useEffect(() => {
@@ -190,12 +232,13 @@ function Exercices() {
 
     try {
       const expected = evaluateExpression(exo.reponse_expr, variablesGen);
-      const userVal = parseFloat(userAnswer.replace(",", "."));
+      const userVal = parseUserAnswer(userAnswer);
 
-      if (isNaN(userVal)) {
-        setFeedback("❌ Réponse invalide");
-        return;
-      }
+if (isNaN(userVal)) {
+  setFeedback("❌ Réponse invalide (nombre ou fraction attendue)");
+  return;
+}
+
 
       const correct = isCloseEnough(userVal, expected);
       setFeedback(correct ? "✅ Correct !" : "❌ Incorrect");
@@ -294,11 +337,25 @@ function Exercices() {
       )}
 
       {feedback.startsWith("❌") && correctionFinal && (
-        <div className="correction-box">
-          <h4>Correction détaillée</h4>
-          <MethodeContent text={correctionFinal} />
-        </div>
-      )}
+  <div className="correction-box">
+    <h4>Correction détaillée</h4>
+    <MethodeContent text={correctionFinal} />
+
+    <button
+      className="method-link-btn"
+      onClick={() =>
+        navigate(
+          `/methodes?automatisme=${encodeURIComponent(
+            exercicesBDD[indexExercice].automatisme
+          )}`
+        )
+      }
+    >
+      📘 Revoir la méthode correspondante
+    </button>
+  </div>
+)}
+
     </div>
   );
 }

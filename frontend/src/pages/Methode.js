@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MethodeContent from "../components/MethodeContent";
 import "../App.css";
+import { useSearchParams } from "react-router-dom";
+
 
 const METHODES_PAR_CATEGORIE = {
   "Calcul numérique et algébrique": [
@@ -34,6 +36,50 @@ function Methode() {
   const [methodes, setMethodes] = useState([]);
   const [selectedMethode, setSelectedMethode] = useState("");
   const [contenu, setContenu] = useState("");
+  const [searchParams] = useSearchParams();
+  const autoFromUrl = searchParams.get("automatisme");
+  console.log("automatisme depuis l'URL =", autoFromUrl);
+
+
+  useEffect(() => {
+  if (!autoFromUrl) return;
+
+  const normalize = s =>
+    s.normalize("NFD")
+     .replace(/[\u0300-\u036f]/g, "")
+     .toLowerCase()
+     .trim();
+
+  const autoNorm = normalize(autoFromUrl);
+
+  const found = Object.entries(METHODES_PAR_CATEGORIE)
+    .find(([_, autos]) =>
+      autos.some(a => normalize(a) === autoNorm)
+    );
+
+  if (!found) {
+    console.warn("Automatisme introuvable :", autoFromUrl);
+    return;
+  }
+
+  const [cat, autos] = found;
+  const realName = autos.find(a => normalize(a) === autoNorm);
+
+  setCategorie(cat);
+  setMethodes(autos);
+  setSelectedMethode(realName);
+
+}, [autoFromUrl]);
+
+
+useEffect(() => {
+  if (!selectedMethode) return;
+
+  handleMethodeChange(selectedMethode);
+
+}, [selectedMethode]);
+
+
 
   const handleCategorieClick = (cat) => {
   setCategorie(cat);
