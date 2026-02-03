@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MethodeContent from "../components/MethodeContent";
 import "../App.css";
+import "../styles/Resume.css"
 import { useSearchParams } from "react-router-dom";
 
 

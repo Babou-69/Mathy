@@ -294,21 +294,20 @@ if (isNaN(userVal)) {
         </div>
       )}
 
-      {/* Onglets exercices */}
+     {/* Onglets exercices */}
       {exercicesBDD.length > 1 && (
-        <div className="methodes-tabs">
-          {exercicesBDD.map((_, i) => (
-            <button
-              key={i}
-              className={indexExercice === i ? "active" : ""}
-              onClick={() => selectExercice(i)}
-            >
-              Exercice {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
-
+    <div className="methodes-tabs">
+      {exercicesBDD.map((_, i) => (
+        <button
+          key={i}
+          className={`exercice-tab ${indexExercice === i ? "active" : ""}`}
+          onClick={() => selectExercice(i)}
+        >
+          Exercice {i + 1}
+        </button>
+      ))}
+    </div>
+  )}
       {/* Énoncé */}
       {enonceFinal && (
         <div className="exercise-area">
