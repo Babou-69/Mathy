@@ -25,25 +25,35 @@ function Navbar({ onLogout }) {
 
         {/* Liens de navigation */}
         <div className="nav-links">
-         <Link  to="/methodes" className={loc.pathname === "/methodes" ? "active" : ""}
+          <Link  to="/" className={loc.pathname === "/" ? "active" : ""}
 >
             <span className="icon">🏠</span>
-            <span className="text">Méthodes</span>
+            <span className="text">Accueil</span>
           </Link>
-          
-          <Link to="/flashcards" className={loc.pathname === "/flashcards" ? "active" : ""}>
-            <span className="icon">⚡</span>
-            <span className="text">Flashcards</span>
+         <Link  to="/methodes" className={loc.pathname === "/methodes" ? "active" : ""}
+>
+            <span className="icon">📓</span>
+            <span className="text">Méthodes</span>
           </Link>
           
           <Link to="/exercices" className={loc.pathname === "/exercices" ? "active" : ""}>
             <span className="icon">📝</span>
             <span className="text">Exercices</span>
           </Link>
+
+          <Link to="/flashcards" className={loc.pathname === "/flashcards" ? "active" : ""}>
+            <span className="icon">⚡</span>
+            <span className="text">Examens Blancs</span>
+          </Link>
           
           <Link to="/stats" className={loc.pathname === "/stats" ? "active" : ""}>
-            <span className="icon">👽</span>
-            <span className="text">Stats</span>
+            <span className="icon">📊</span>
+            <span className="text">Ma progression</span>
+          </Link>
+
+          <Link to="/" className={loc.pathname === "/" ? "active" : ""}>
+            <span className="icon">👤</span>
+            <span className="text">Mon compte</span>
           </Link>
         </div>
 
