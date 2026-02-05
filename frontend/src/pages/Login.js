@@ -15,7 +15,6 @@ function Login({ onLogin }) {
     try {
       const res = await fetch("http://localhost:3001/login", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user, password }),
       });
@@ -27,21 +26,38 @@ function Login({ onLogin }) {
         return;
       }
 
-      // Appelle le callback pour mettre à jour App.js
-      onLogin(user, data.score || 0);
+      if (!data.token) {
+        setError("Token manquant");
+        return;
+      }
 
-      // Redirige vers la page principale
-      navigate("/");
+      // ✅ stockage JWT
+      localStorage.setItem("token", data.token);
+
+      // ✅ on garde juste l'identifiant côté front
+      onLogin(user);
+
+      // ✅ redirection
+      navigate("/exercices");
+
     } catch (err) {
       console.error(err);
       setError("Impossible de se connecter au serveur");
     }
   };
 
-
   return (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+    }}
+  >
     <div style={{ padding: 20 }}>
       <h2>Login</h2>
+
       <form onSubmit={handleSubmit}>
         <input
           placeholder="Identifiant"
@@ -49,6 +65,7 @@ function Login({ onLogin }) {
           onChange={(e) => setUser(e.target.value)}
         />
         <br />
+
         <input
           type="password"
           placeholder="Mot de passe"
@@ -56,8 +73,10 @@ function Login({ onLogin }) {
           onChange={(e) => setPassword(e.target.value)}
         />
         <br />
+
         <button type="submit">Se connecter</button>
       </form>
+
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       <p>
@@ -67,7 +86,8 @@ function Login({ onLogin }) {
         </button>
       </p>
     </div>
-  );
+  </div>
+);
 }
 
 export default Login;

@@ -17,54 +17,61 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import "../App.css";
 
-function Stats() {
+function Stats({ user }) {
   const [stats, setStats] = useState([]);
   const [globalData, setGlobalData] = useState({ total: 0, correct: 0 });
   const [message, setMessage] = useState("");
 
-  const pdfRef = useRef(); 
+  const pdfRef = useRef();
 
   useEffect(() => {
-    const user = localStorage.getItem("user"); // ou une variable user provenant de App.js
-
     if (!user) return;
 
-    fetch(`http://localhost:3001/stats/${user}`)
-  .then((res) => res.json())
-  .then((data) => {
-    // data est un tableau avec 1 objet : l'utilisateur
-    if (data.length === 0) return;
+    const token = localStorage.getItem("token");
 
-    const userStats = data[0];
-
-    // On peut créer un tableau "categories" factices pour les graphiques
-    const formatted = [
-      {
-        category: "Exercices faits",
-        correct: userStats.nbr_exs_reussis,
-        total: userStats.nbr_exs_faits,
-        rate: userStats.nbr_exs_faits
-          ? Math.round((userStats.nbr_exs_reussis / userStats.nbr_exs_faits) * 100)
-          : 0,
+    fetch("http://localhost:3001/stats", {
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-      {
-        category: "Examens blancs",
-        correct: userStats.nbr_exams_blancs_faits, // si tu as nbr_exams_blancs_reussis, tu peux faire un taux
-        total: userStats.nbr_exams_blancs_faits,
-        rate: 100, // si on ne connaît pas les réussites, on met 100%
-      },
-    ];
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Non autorisé");
+        return res.json();
+      })
+      .then((data) => {
+        if (!data || data.length === 0) {
+          setStats([]);
+          setGlobalData({ total: 0, correct: 0 });
+          return;
+        }
 
-    setStats(formatted);
+        // Mapping catégories (si numériques)
+        const CATEGORY_LABELS = {
+          1: "Calcul numérique et algébrique",
+          2: "Proportions et pourcentages",
+          3: "Évolutions et variations",
+        };
 
-    // Calcul global
-    const total = formatted.reduce((a, c) => a + c.total, 0);
-    const correct = formatted.reduce((a, c) => a + c.correct, 0);
-    setGlobalData({ total, correct });
-  })
-  .catch((err) => console.error("Erreur fetch stats :", err));
+        const formatted = data.map((d) => ({
+          category:
+            CATEGORY_LABELS[d.category] || `Catégorie ${d.category}`,
+          total: d.total || 0,
+          correct: d.correct || 0,
+          rate: d.rate || 0,
+        }));
 
-  }, []);
+        setStats(formatted);
+
+        const total = formatted.reduce((a, c) => a + c.total, 0);
+        const correct = formatted.reduce((a, c) => a + c.correct, 0);
+
+        setGlobalData({ total, correct });
+      })
+      .catch((err) => {
+        console.error("Erreur fetch stats :", err);
+        setMessage("Impossible de charger les statistiques.");
+      });
+  }, [user]);
 
   const COLORS = [
     "#4caf50",
@@ -76,7 +83,12 @@ function Stats() {
     "#795548",
   ];
 
-  // Export PDF
+  const pieData = stats.map((s) => ({
+    name: s.category,
+    value: s.correct,
+  }));
+
+  // --- export PDF inchangé ---
   const handleExportPDF = async () => {
     const input = pdfRef.current;
     if (!input) return;
@@ -91,7 +103,7 @@ function Stats() {
     pdf.setFontSize(22);
     pdf.text("Rapport de révision", 20, 40);
     pdf.setFontSize(14);
-    pdf.text(`Nom : ${localStorage.getItem("user") || "Utilisateur"}`, 20, 60);
+    pdf.text(`Nom : ${user || "Utilisateur"}`, 20, 60);
     pdf.text(`Date du rapport : ${today}`, 20, 70);
 
     pdf.addPage();
@@ -103,13 +115,11 @@ function Stats() {
     pdf.save(`rapport_revision_${today.replaceAll("/", "-")}.pdf`);
   };
 
-  const pieData = stats.map((s) => ({
-    name: s.category,
-    value: s.correct,
-  }));
-
   return (
-    <div className="container" style={{ textAlign: "center", marginTop: "1rem" }}>
+    <div
+      className="container"
+      style={{ textAlign: "center", marginTop: "1rem" }}
+    >
       <h2>📊 Statistiques générales</h2>
 
       {stats.length === 0 ? (
@@ -117,114 +127,78 @@ function Stats() {
       ) : (
         <>
           <div ref={pdfRef}>
-            {/* Graphique global */}
-            <div style={{ width: "100%", height: 300, marginBottom: "2rem" }}>
-              <h3>Taux de réussite global</h3>
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    dataKey="value"
-                    label={({ name, value }) => `${name} (${value})`}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Graphique en barres */}
-            <div style={{ width: "100%", height: 350 }}>
-              <h3>Taux de réussite par catégorie</h3>
-              <ResponsiveContainer>
-                <BarChart
-                  data={stats}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+            {/* --- Graphique circulaire --- */}
+            <h3>Taux de réussite par catégorie</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={100}
+                  label
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="category" tick={{ fontSize: 10 }} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="rate" fill="#4caf50" name="Taux de réussite (%)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+                  {pieData.map((_, index) => (
+                    <Cell
+                      key={index}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
 
-            {/* Tableau récapitulatif */}
-            <h3 style={{ marginTop: "2rem" }}>Résumé chiffré</h3>
-            <table className="score-table">
-              <thead>
-                <tr>
-                  <th>Catégorie</th>
-                  <th>Taux de réussite</th>
-                  <th>Réussies</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.map((s, i) => (
-                  <tr key={i}>
-                    <td>{s.category}</td>
-                    <td>{s.rate}%</td>
-                    <td>{s.correct}</td>
-                    <td>{s.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* --- Graphique en barres --- */}
+            <h3>Résultats détaillés</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={stats}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="category" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="correct" fill="#4caf50" name="Réussites" />
+                <Bar dataKey="total" fill="#f44336" name="Tentatives" />
+              </BarChart>
+            </ResponsiveContainer>
 
-            {/* Données globales */}
-            <div style={{ marginTop: "1.5rem" }}>
-              <p>
-                <strong>Total d’exercices réalisés :</strong> {globalData.total}
-              </p>
-              <p>
-                <strong>Total de réussites :</strong> {globalData.correct}
-              </p>
-              <p>
-                <strong>Taux de réussite global :</strong>{" "}
-                {globalData.total > 0
-                  ? Math.round((globalData.correct / globalData.total) * 100)
+            {/* --- Résumé global --- */}
+            <h3>Résumé global</h3>
+            <p>
+              Total tentatives : <strong>{globalData.total}</strong>
+            </p>
+            <p>
+              Total réussites : <strong>{globalData.correct}</strong>
+            </p>
+            <p>
+              Taux global :{" "}
+              <strong>
+                {globalData.total
+                  ? Math.round(
+                      (globalData.correct / globalData.total) * 100
+                    )
                   : 0}
                 %
-              </p>
-            </div>
+              </strong>
+            </p>
           </div>
 
-          {/* Boutons d’action */}
-          <div style={{ marginTop: "2rem" }}>
-            <button
-              onClick={handleExportPDF}
-              style={{
-                background: "#2196f3",
-                color: "white",
-                border: "none",
-                padding: "0.6rem 1.2rem",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontSize: "1rem",
-                marginRight: "0.5rem",
-              }}
-            >
-              📄 Exporter en PDF
-            </button>
-          </div>
+          <button onClick={handleExportPDF} style={{ marginTop: "1rem" }}>
+            📄 Exporter en PDF
+          </button>
         </>
       )}
 
       {message && (
-        <p style={{ color: "#4caf50", marginTop: "1rem", fontWeight: "bold" }}>
+        <p
+          style={{
+            color: "#f44336",
+            marginTop: "1rem",
+            fontWeight: "bold",
+          }}
+        >
           {message}
         </p>
       )}

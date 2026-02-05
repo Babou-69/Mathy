@@ -1,74 +1,230 @@
 const express = require("express");
 const cors = require("cors");
 const sqlite3 = require("sqlite3").verbose();
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const PORT = 3001;
-const session = require("express-session");
+const JWT_SECRET = "SECRET_KEY";
+const bcrypt = require("bcrypt");
 
-app.use(session({
-  secret: "SECRET_KEY_A_CHANGER",
-  resave: false,
-  saveUninitialized: false, // 👈 important
-  cookie: {
-    secure: false,
-    sameSite: "lax"
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.sendStatus(401);
   }
-}));
+
+  jwt.verify(token, process.env.JWT_SECRET || "SECRET_KEY", (err, user) => {
+    if (err) {
+      return res.sendStatus(403);
+    }
+    req.user = user;
+    next();
+  });
+}
 
 
 app.use(cors({
-  origin: "http://localhost:3000", // URL du frontend
+  origin: "http://localhost:3000",
   credentials: true
 }));
-
 app.use(express.json());
 
 // ===== SQLITE =====
-const db = new sqlite3.Database("BDD1.db");
-
-// Middleware pour vérifier si l'utilisateur est connecté
-const auth = (req, res, next) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).json({ error: "Non connecté" });
+const db = new sqlite3.Database("BDD1.db", (err) => {
+  if (err) {
+    console.error("Erreur ouverture DB :", err);
+  } else {
+    console.log("📦 SQLite connecté");
   }
-  next();
+});
+
+// 🔐 Autoriser lecture pendant écriture
+db.serialize(() => {
+  db.run("PRAGMA journal_mode = WAL;");
+  db.run("PRAGMA busy_timeout = 5000;");
+});
+
+// ===== JWT MIDDLEWARE =====
+const authJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token manquant" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ error: "Token invalide" });
+    }
+    req.user = decoded; // { id, identifiant }
+    next();
+  });
 };
 
+// ===== NORMALIZE =====
 const normalize = (str) =>
   str
-    .normalize("NFD")                // enlève les accents
+    .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/’/g, "'")              // apostrophes typographiques
-    .replace(/\s+/g, " ")            // espaces multiples
+    .replace(/’/g, "'")
+    .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 
+// ===== LOGIN =====
+// ===== EXERCICE RECOMMANDÉ (PROTÉGÉ) =====
+app.get("/recommend-exercise", authJWT, (req, res) => {
+  const userIdentifiant = req.user.identifiant;
 
-app.post("/login", (req, res) => {
-  const { user, password } = req.body; // user = identifiant envoyé par le frontend
-
-  db.get("SELECT * FROM Utilisateur WHERE identifiant = ?", [user], (err, dbUser) => {
+  // On récupère tous les exercices possibles
+  db.all("SELECT DISTINCT automatisme, categorie FROM Exercices", [], (err, allAutos) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!dbUser) return res.status(401).json({ error: "Utilisateur introuvable" });
-    if (dbUser.mot_de_passe !== password) return res.status(401).json({ error: "Mot de passe incorrect" });
 
-    req.session.userId = dbUser.id; // ici on prend l'id de la base
-    res.json({ success: true, score: dbUser.score || 0 }); // si tu as une colonne score
+    // On récupère les stats de l'utilisateur
+    db.all(
+      `SELECT Exercice_categorie, SUM(nbre_realisation) as fait, SUM(nbre_juste) as juste 
+       FROM Utilisateur_Exercice 
+       WHERE Utilisateur_identifiant = ? 
+       GROUP BY Exercice_categorie`,
+      [userIdentifiant],
+      (err, stats) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        const statsMap = {};
+        stats.forEach(s => { statsMap[s.Exercice_categorie] = s; });
+
+        // Algorithme de priorité
+        // On cherche l'automatisme dont la catégorie a le score le plus bas
+        let bestTarget = allAutos[0].automatisme;
+        let minScore = Infinity;
+
+        allAutos.forEach(auto => {
+          const stat = statsMap[auto.categorie] || { fait: 0, juste: 0 };
+          
+          // Calcul du score : (Taux de réussite) + (Nombre de fois fait / 10)
+          // Si fait = 0, le score est 0 (priorité maximale)
+          let score = stat.fait === 0 ? 0 : (stat.juste / stat.fait) * 100 + (stat.fait * 2);
+
+          if (score < minScore) {
+            minScore = score;
+            bestTarget = auto.automatisme;
+          }
+        });
+
+        res.json({ automatisme: bestTarget });
+      }
+    );
   });
 });
 
-app.get("/methode/:automatisme", (req, res) => {
+app.post("/login", (req, res) => {
+  const { user, password } = req.body;
+
+  db.get("SELECT * FROM Utilisateur WHERE identifiant = ?", [user], async (err, dbUser) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!dbUser) return res.status(401).json({ error: "Utilisateur introuvable" });
+
+    // bcrypt.compare vérifie si le mot de passe clair correspond au hachage
+    const isMatch = await bcrypt.compare(password, dbUser.mot_de_passe);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Mot de passe incorrect" });
+    }
+
+    const token = jwt.sign({ id: dbUser.id, identifiant: dbUser.identifiant }, JWT_SECRET, { expiresIn: "8h" });
+    res.json({ token, user: dbUser.identifiant, score: dbUser.score || 0 });
+  });
+});
+
+// ===== REGISTER =====
+app.post("/register", async (req, res) => {
+  const { user, password } = req.body;
+
+  db.get("SELECT * FROM Utilisateur WHERE identifiant = ?", [user], async (err, dbUser) => {
+    if (dbUser) return res.status(400).json({ error: "Utilisateur déjà existant" });
+
+    try {
+      // On génère le hachage (le nombre 10 correspond au coût de calcul)
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      db.run(
+        "INSERT INTO Utilisateur (identifiant, mot_de_passe) VALUES (?, ?)",
+        [user, hashedPassword],
+        function (err) {
+          if (err) return res.status(500).json({ error: err.message });
+          
+          const token = jwt.sign({ id: this.lastID, identifiant: user }, JWT_SECRET, { expiresIn: "8h" });
+          res.json({ token, user });
+        }
+      );
+    } catch (e) {
+      res.status(500).json({ error: "Erreur lors du hachage" });
+    }
+  });
+});
+
+// ===== AUTOMATISMES (PROTÉGÉ) =====
+app.get("/automatismes", authJWT, (req, res) => {
+  const categoriesMap = {
+    1: "Proportions et pourcentages",
+    2: "Évolutions et variations",
+    3: "Calcul numérique et algébrique",
+  };
+
+  db.all(
+    "SELECT * FROM Exercices ORDER BY categorie, automatisme",
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      const map = {};
+      rows.forEach((r) => {
+        const cat = categoriesMap[r.categorie] || "Autres";
+        if (!map[cat]) map[cat] = [];
+        if (r.automatisme && !map[cat].includes(r.automatisme)) {
+          map[cat].push(r.automatisme);
+        }
+      });
+
+      res.json(map);
+    }
+  );
+});
+
+// ===== EXERCICES PAR AUTOMATISME (PROTÉGÉ) =====
+app.get("/exercices/:automatisme", authJWT, (req, res) => {
+  const autoClient = normalize(req.params.automatisme);
+
+  db.all("SELECT * FROM Exercices", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const resultats = rows.filter(
+      r => normalize(r.automatisme) === autoClient
+    );
+
+    if (resultats.length === 0) {
+      return res.status(404).json({ error: "Exercices introuvables" });
+    }
+
+    res.json(resultats);
+  });
+});
+
+// ===== METHODES PAR AUTOMATISME (PROTÉGÉ) =====
+app.get("/methode/:automatisme", authJWT, (req, res) => {
   const autoClient = normalize(req.params.automatisme);
 
   db.all(
-    "SELECT automatisme, contenu, exemple FROM Methode",
+    "SELECT * FROM Methode",
     [],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
 
       const resultats = rows.filter(
-        (r) => normalize(r.automatisme) === autoClient
+        r => normalize(r.automatisme) === autoClient
       );
 
       if (resultats.length === 0) {
@@ -81,181 +237,97 @@ app.get("/methode/:automatisme", (req, res) => {
 });
 
 
-
-
-// SIGNUP
-app.post("/register", (req, res) => {
-  const { user, password } = req.body;
-
-  db.get("SELECT * FROM Utilisateur WHERE identifiant = ?", [user], (err, dbUser) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (dbUser) return res.status(400).json({ error: "Utilisateur déjà existant" });
-
-    db.run(
-      "INSERT INTO Utilisateur (identifiant, mot_de_passe) VALUES (?, ?)",
-      [user, password],
-      function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-
-        req.session.userId = this.lastID;
-        res.json({ success: true, score: 0 });
-      }
-    );
-  });
-});
-
-
-app.get("/stats/:user", (req, res) => {
-  const user = req.params.user;
+// ===== STATS (PROTÉGÉ) =====
+app.get("/stats", authJWT, (req, res) => {
+  const userIdentifiant = req.user.identifiant;
 
   db.all(
-    `SELECT * FROM Utilisateur
-     WHERE identifiant = ?`,
-    [user],
+    `
+    SELECT
+      Exercice_categorie AS category,
+      SUM(nbre_realisation) AS total,
+      SUM(nbre_juste) AS correct,
+      CASE
+        WHEN SUM(nbre_realisation) > 0
+        THEN ROUND(100.0 * SUM(nbre_juste) / SUM(nbre_realisation))
+        ELSE 0
+      END AS rate
+    FROM Utilisateur_Exercice
+    WHERE Utilisateur_identifiant = ?
+    GROUP BY Exercice_categorie
+    ORDER BY Exercice_categorie
+    `,
+    [userIdentifiant],
     (err, rows) => {
       if (err) {
-        console.error(err);
-        return res.status(500).json([]);
+        console.error("Erreur SQL stats :", err);
+        return res.status(500).json({ error: err.message });
       }
       res.json(rows);
     }
   );
 });
 
-app.post("/save-result", (req, res) => {
-  console.log("BODY REÇU :", req.body);
 
-  const { user, correct } = req.body;
+// ===== SAVE RESULT (PROTÉGÉ) =====
+app.post("/save-result", authJWT, (req, res) => {
+  const {
+    exercice_numero,
+    exercice_categorie = 0,
+    correct,
+    duree = 0
+  } = req.body;
 
-  if (!user) {
-    return res.status(400).json({ message: "Utilisateur manquant" });
-  }
+  const userIdentifiant = req.user.identifiant;
+  const dateNow = new Date().toISOString();
 
-  db.get(
-    `SELECT * FROM Utilisateur WHERE identifiant = ?`,
-    [user],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Erreur DB" });
-      }
+  const score = correct ? 1 : 0;
+  const incrementJuste = correct ? 1 : 0;
 
-      if (!row) {
-        return res.status(404).json({ message: "Utilisateur introuvable" });
-      }
-
-      db.run(
-        `UPDATE Utilisateur
-         SET
-           nbr_exs_faits = nbr_exs_faits + 1,
-           nbr_exs_reussis = nbr_exs_reussis + ?
-         WHERE identifiant = ?`,
-        [correct ? 1 : 0, user],
-        function (err) {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ message: "Erreur mise à jour" });
-          }
-
-          res.json({ message: "Progression enregistrée" });
-        }
-      );
-    }
-  );
-});
-
-app.post("/increment-score", auth, (req, res) => {
-  const userId = req.session.userId;
   db.run(
-    "UPDATE Utilisateur SET nbr_exs_faits = nbr_exs_faits + 1 WHERE identifiant = ?",
-    [userId],
+    `
+    INSERT INTO Utilisateur_Exercice (
+      Utilisateur_identifiant,
+      Exercice_numero,
+      Exercice_categorie,
+      dernier_score,
+      meilleur_score,
+      date_derniere_realisation,
+      duree_realisation,
+      nbre_realisation,
+      nbre_juste
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+    ON CONFLICT(Utilisateur_identifiant, Exercice_numero)
+    DO UPDATE SET
+      dernier_score = excluded.dernier_score,
+      meilleur_score = MAX(meilleur_score, excluded.meilleur_score),
+      date_derniere_realisation = excluded.date_derniere_realisation,
+      duree_realisation = excluded.duree_realisation,
+      nbre_realisation = nbre_realisation + 1,
+      nbre_juste = nbre_juste + excluded.nbre_juste
+    `,
+    [
+      userIdentifiant,
+      exercice_numero,
+      exercice_categorie,
+      score,
+      score,
+      dateNow,
+      duree,
+      incrementJuste
+    ],
     function (err) {
-      if (err) return res.status(500).json({ error: err.message });
-      db.get("SELECT nbr_exs_faits FROM users WHERE identifiant = ?", [userId], (err, row) => {
-        res.json({ success: true, score: row.nbr_exs_faits });
-      });
-    }
-  );
-});
-
-app.get("/me", (req, res) => {
-  if (!req.session.userId) {
-    return res.json({ logged: false });
-  }
-
-  db.get(
-    "SELECT identifiant FROM Utilisateur WHERE id = ?",
-    [req.session.userId],
-    (err, row) => {
-      if (err || !row) {
-        return res.json({ logged: false });
+      if (err) {
+        console.error("Erreur SQL UPSERT :", err);
+        return res.status(500).json({ error: err.message });
       }
-
-      res.json({
-        logged: true,
-        user: row.identifiant
-      });
-    }
-  );
-});
-
-app.get("/exercices/:automatisme", (req, res) => {
-  const autoClient = normalize(req.params.automatisme);
-
-  db.all(
-    `SELECT * FROM Exercices`,
-    [],
-    (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      const resultats = rows.filter(
-  (r) => normalize(r.automatisme) === autoClient
-);
-
-
-
-      if (resultats.length === 0) {
-        return res.status(404).json({ error: "Exercices introuvables" });
-      }
-
-      res.json(resultats);
-    }
-  );
-});
-
-
-// Récupérer tous les automatismes par catégorie
-// Récupérer tous les automatismes par catégorie (avec mapping des IDs vers noms)
-app.get("/automatismes", (req, res) => {
-  const categoriesMap = {
-    1: "Calcul numérique et algébrique",
-    2: "Proportions et pourcentages",
-    3: "Évolutions et variations"
-  };
-
-  db.all(
-    `SELECT * FROM Exercices ORDER BY categorie, automatisme`,
-    [],
-    (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      // Transformation en map catégorie → liste d'automatismes
-      const map = {};
-      rows.forEach(r => {
-  const cat = categoriesMap[r.categorie] || "Autres";
-  if (!map[cat]) map[cat] = [];
-  if (!map[cat].includes(r.automatisme) && r.automatisme) {
-    map[cat].push(r.automatisme);
-  }
-});
-
-
-      res.json(map);
+      res.json({ success: true });
     }
   );
 });
 
 
 app.listen(PORT, () => {
-  console.log("Serveur lancé sur http://localhost:" + PORT);
+  console.log("✅ Serveur JWT lancé sur http://localhost:" + PORT);
 });

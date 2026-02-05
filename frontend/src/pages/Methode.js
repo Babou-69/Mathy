@@ -1,16 +1,9 @@
 import React, { useState, useEffect } from "react";
 import MethodeContent from "../components/MethodeContent";
 import "../App.css";
-import "../styles/Resume.css"
-import { useSearchParams } from "react-router-dom";
-
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 const METHODES_PAR_CATEGORIE = {
-  "Calcul numérique et algébrique": [
-    "Effectuer des opérations sur les puissances",
-    "Effectuer des opérations et des comparaisons entre des fractions simples",
-    "Passer d’une écriture d’un nombre à une autre",
-    "Estimer un ordre de grandeur"  ],
   "Proportions et pourcentages": [
     "Déterminer une proportion",
     "Calculer un effectif",
@@ -22,13 +15,16 @@ const METHODES_PAR_CATEGORIE = {
     "Appliquer un taux d’évolution pour calculer une valeur de départ ou d’arrivée",
     "Calculer un taux d’évolution global",
     "Calculer un taux d’évolution réciproque"
+  ],
+  "Calcul numérique et algébrique": [
+    "Effectuer des opérations sur les puissances",
+    "Effectuer des opérations et des comparaisons entre des fractions simples",
+    "Passer d’une écriture d’un nombre à une autre",
+    "Estimer un ordre de grandeur"
   ]
 };
 
-
 const CATEGORIES = Object.keys(METHODES_PAR_CATEGORIE);
-
-
 
 function Methode() {
   const [methodesBDD, setMethodesBDD] = useState([]);
@@ -39,92 +35,81 @@ function Methode() {
   const [contenu, setContenu] = useState("");
   const [searchParams] = useSearchParams();
   const autoFromUrl = searchParams.get("automatisme");
-  console.log("automatisme depuis l'URL =", autoFromUrl);
-
+  const navigate = useNavigate();
 
   useEffect(() => {
-  if (!autoFromUrl) return;
+    if (!autoFromUrl) return;
 
-  const normalize = s =>
-    s.normalize("NFD")
-     .replace(/[\u0300-\u036f]/g, "")
-     .toLowerCase()
-     .trim();
+    const normalize = s =>
+      s.normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
 
-  const autoNorm = normalize(autoFromUrl);
+    const autoNorm = normalize(autoFromUrl);
 
-  const found = Object.entries(METHODES_PAR_CATEGORIE)
-    .find(([_, autos]) =>
-      autos.some(a => normalize(a) === autoNorm)
-    );
+    const found = Object.entries(METHODES_PAR_CATEGORIE)
+      .find(([_, autos]) =>
+        autos.some(a => normalize(a) === autoNorm)
+      );
 
-  if (!found) {
-    console.warn("Automatisme introuvable :", autoFromUrl);
-    return;
-  }
+    if (!found) {
+      console.warn("Automatisme introuvable :", autoFromUrl);
+      return;
+    }
 
-  const [cat, autos] = found;
-  const realName = autos.find(a => normalize(a) === autoNorm);
+    const [cat, autos] = found;
+    const realName = autos.find(a => normalize(a) === autoNorm);
 
-  setCategorie(cat);
-  setMethodes(autos);
-  setSelectedMethode(realName);
+    setCategorie(cat);
+    setMethodes(autos);
+    setSelectedMethode(realName);
+  }, [autoFromUrl]);
 
-}, [autoFromUrl]);
-
-
-useEffect(() => {
-  if (!selectedMethode) return;
-
-  handleMethodeChange(selectedMethode);
-
-}, [selectedMethode]);
-
-
+  useEffect(() => {
+    if (!selectedMethode) return;
+    handleMethodeChange(selectedMethode);
+  }, [selectedMethode]);
 
   const handleCategorieClick = (cat) => {
-  setCategorie(cat);
-  setMethodes(METHODES_PAR_CATEGORIE[cat] || []);
-  setSelectedMethode("");
-
-  // 🔄 RESET COMPLET
-  setMethodesBDD([]);
-  setIndexMethode(0);
-  setContenu("");
-};
+    setCategorie(cat);
+    setMethodes(METHODES_PAR_CATEGORIE[cat] || []);
+    setSelectedMethode("");
+    setMethodesBDD([]);
+    setIndexMethode(0);
+    setContenu("");
+  };
 
   const handleMethodeChange = async (methode) => {
-  setSelectedMethode(methode);
+    setSelectedMethode(methode);
+    setMethodesBDD([]);
+    setIndexMethode(0);
+    setContenu("");
 
-  // 🔄 RESET COMPLET
-  setMethodesBDD([]);
-  setIndexMethode(0);
-  setContenu("");
+    if (!methode) return;
 
-  if (!methode) return;
+    try {
+      const res = await fetch(
+        `http://localhost:3001/methode/${encodeURIComponent(methode)}`,
+        {
+          headers: {
+            Authorization: "Bearer " + localStorage.getItem("token")
+          }
+        }
+      );
 
-  try {
-    const res = await fetch(
-      `http://localhost:3001/methode/${encodeURIComponent(methode)}`
-    );
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setMethodesBDD(data);
+      afficherMethode(data, 0, methode);
+    } catch {
+      setContenu("❌ Méthode introuvable.");
+    }
+  };
 
-    if (!res.ok) throw new Error();
-
-    const data = await res.json(); // tableau de méthodes
-
-    setMethodesBDD(data);
-
-    // ✅ AFFICHER TOUJOURS LA MÉTHODE 1 PAR DÉFAUT
-    afficherMethode(data, 0, methode);
-  } catch {
-    setContenu("❌ Méthode introuvable.");
-  }
-};
-
-const afficherMethode = (list, index, automatisme) => {
-  const m = list[index];
-
-  setContenu(`
+  const afficherMethode = (list, index, automatisme) => {
+    const m = list[index];
+    setContenu(`
 ### ${automatisme} — Méthode ${index + 1}
 
 ${m.contenu}
@@ -135,8 +120,7 @@ ${m.contenu}
 
 ${m.exemple}
 `);
-};
-
+  };
 
   return (
     <div className="container">
@@ -175,28 +159,41 @@ ${m.exemple}
       )}
 
       {/* Boutons Méthode 1 / 2 / 3 */}
-{methodesBDD.length > 1 && (
-  <div className="methodes-tabs">
-    {methodesBDD.map((_, i) => (
-      <button
-        key={i}
-        onClick={() => {
-  setIndexMethode(i);
-  afficherMethode(methodesBDD, i, selectedMethode);
-}}
-
-        className={indexMethode === i ? "active" : ""}
-      >
-        Méthode {i + 1}
-      </button>
-    ))}
-  </div>
-)}
+      {methodesBDD.length > 1 && (
+        <div className="methodes-tabs">
+          {methodesBDD.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setIndexMethode(i);
+                afficherMethode(methodesBDD, i, selectedMethode);
+              }}
+              className={indexMethode === i ? "active" : ""}
+            >
+              Méthode {i + 1}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Contenu */}
       {contenu && (
         <div className="methode-contenu">
           <MethodeContent text={contenu} />
+        </div>
+      )}
+
+      {/* Bouton de redirection vers les exercices */}
+      {selectedMethode && contenu && !contenu.includes("❌") && (
+        <div style={{ marginTop: "2rem", textAlign: "center", paddingBottom: "2rem" }}>
+          <button
+            className="method-link-btn"
+            onClick={() =>
+              navigate(`/exercices?automatisme=${encodeURIComponent(selectedMethode)}`)
+            }
+          >
+            ✏️ S'entraîner sur cet automatisme
+          </button>
         </div>
       )}
     </div>
