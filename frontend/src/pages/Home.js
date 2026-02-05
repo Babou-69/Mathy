@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
 import MethodeContent from "../components/MethodeContent";
@@ -9,40 +9,86 @@ function Home({ user }) {
   const [currentExo, setCurrentExo] = useState(null);
   const [variables, setVariables] = useState({});
   const [userAnswer, setUserAnswer] = useState("");
-  const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', msg: '' }
+  const [feedback, setFeedback] = useState(null);
 
-  // --- LOGIQUE DE GÉNÉRATION (Identique à Exercices.js) ---
+  /* =========================
+     FONCTIONS UTILITAIRES
+  ========================= */
+
   const extractVariables = (text) => {
-    const matches = text.match(/{{([a-z0-9_]+)}}/g);
-    return matches ? [...new Set(matches.map((m) => m.replace(/{{|}}/g, "")))] : [];
+    if (!text) return [];
+    const vars = new Set();
+    const braces = /{{([a-z0-9]+)}}/gi;
+    const latexVar = /\\var\(([a-z0-9]+)\)/g;
+
+    let m;
+    while ((m = braces.exec(text))) vars.add(m[1]);
+    while ((m = latexVar.exec(text))) vars.add(m[1]);
+
+    return Array.from(vars);
   };
 
   const generateVariables = (exo) => {
-    const vars = extractVariables(exo.enonce + " " + (exo.correction || ""));
+    // On extrait les variables de TOUS les champs pour être sûr de ne rien oublier
+    const vars = extractVariables(exo.enonce + " " + (exo.correction || "") + " " + (exo.reponse_expr || ""));
     const vals = {};
     vars.forEach((v) => {
       vals[v] = Math.floor(Math.random() * 80) + 10;
     });
-    // Contrainte x > y pour éviter les résultats négatifs si besoin
+
+    // Contrainte x > y pour éviter les résultats négatifs (ex: évolutions)
     if (vals.x !== undefined && vals.y !== undefined && vals.x < vals.y) {
-        [vals.x, vals.y] = [vals.y, vals.x];
+      [vals.x, vals.y] = [vals.y, vals.x];
     }
     return vals;
   };
 
-  const replaceVars = (text, vals) => {
-  if (!text) return "";
-  let t = text;
-  Object.keys(vals).forEach((v) => {
-    // Remplace {{x}}
-    t = t.replace(new RegExp(`{{${v}}}`, "g"), vals[v]);
-    // Remplace \var(x) en gérant bien l'échappement des caractères spéciaux
-    t = t.replace(new RegExp(`\\\\var\\(${v}\\)`, "g"), vals[v]);
-  });
-  return t;
-};
+  const replaceVariables = (text, variables) => {
+    if (!text) return "";
+    let result = text;
+    Object.entries(variables).forEach(([v, val]) => {
+      result = result
+        .replace(new RegExp(`{{${v}}}`, "g"), val)
+        .replace(new RegExp(`\\\\var\\(${v}\\)`, "g"), val);
+    });
+    return result;
+  };
 
-  // --- ACTIONS ---
+  const evaluateExpression = (expr, variables) => {
+    let e = expr;
+    Object.entries(variables).forEach(([v, val]) => {
+      // Remplace la variable isolée par sa valeur
+      e = e.replace(new RegExp(`\\b${v}\\b`, 'g'), val);
+    });
+
+    try {
+      // Nettoyage pour le calcul
+      e = e.replace(/\s/g, "").replace(/,/g, ".");
+      // eslint-disable-next-line no-new-func
+      return Function(`return ${e}`)();
+    } catch (err) {
+      console.error("Erreur d'évaluation :", e, err);
+      return null;
+    }
+  };
+
+  const parseUserAnswer = (input) => {
+    if (!input) return NaN;
+    let s = input.trim().replace(",", ".");
+    if (s.includes("/")) {
+      const [numStr, denStr] = s.split("/");
+      const num = parseFloat(numStr);
+      const den = parseFloat(denStr);
+      if (isNaN(num) || isNaN(den) || den === 0) return NaN;
+      return num / den;
+    }
+    return parseFloat(s);
+  };
+
+  /* =========================
+     ACTIONS
+  ========================= */
+
   const fetchRecommendation = async () => {
     setLoading(true);
     setFeedback(null);
@@ -54,81 +100,67 @@ function Home({ user }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      
+
       if (data.automatisme) {
         const resExos = await fetch(`http://localhost:3001/exercices/${encodeURIComponent(data.automatisme)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const exos = await resExos.json();
         const exo = exos[Math.floor(Math.random() * exos.length)];
-        
+
         const vals = generateVariables(exo);
         setCurrentExo(exo);
         setVariables(vals);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Erreur recommandation:", err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  const token = localStorage.getItem("token");
+    e.preventDefault();
+    const token = localStorage.getItem("token");
 
-  // 1. Calcul du résultat attendu
-  let expr = replaceVars(currentExo.reponse_expr, variables);
-  expr = expr.replace(/\s/g, "").replace(/,/g, ".");
-
-  let expected;
-  try {
-    // eslint-disable-next-line no-eval
-    expected = eval(expr);
-    // Arrondi pour éviter les erreurs de flottants (ex: 0.1 + 0.2)
-    expected = Math.round(expected * 100) / 100;
-  } catch (err) {
-    console.error("Erreur eval:", err);
-    expected = null;
-  }
-
-  // 2. Nettoyage de la réponse utilisateur
-  const cleanedUserAnswer = userAnswer.trim().replace(",", ".");
-  const userNum = parseFloat(cleanedUserAnswer);
-
-  // 3. Comparaison stricte
-  const isCorrect = !isNaN(userNum) && userNum === expected;
-
-  // 4. SAUVEGARDE EN BDD (Important pour que la recommandation évolue !)
-  try {
-    const res = await fetch("http://localhost:3001/save-result", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify({
-        exercice_numero: currentExo.numero,
-        exercice_categorie: currentExo.categorie,
-        correct: isCorrect,
-        duree: 0 // Optionnel
-      }),
-    });
+    // 1. Calcul attendu
+    const expected = evaluateExpression(currentExo.reponse_expr, variables);
     
-    if (!res.ok) console.error("Erreur lors de la sauvegarde du score");
-  } catch (err) {
-    console.error("Erreur réseau sauvegarde:", err);
-  }
+    // 2. Réponse utilisateur
+    const userVal = parseUserAnswer(userAnswer);
 
-  // 5. Mise à jour du feedback visuel
-  setFeedback({
-    type: isCorrect ? "success" : "error",
-    message: isCorrect 
-      ? "Bravo ! C'est la bonne réponse." 
-      : `Dommage. La réponse attendue était ${expected}.`,
-    correction: replaceVars(currentExo.correction, variables)
-  });
-};
+    // 3. Comparaison avec tolérance
+    const isCorrect = !isNaN(userVal) && expected !== null && Math.abs(userVal - expected) < 0.01;
+
+    // 4. Sauvegarde BDD
+    try {
+      await fetch("http://localhost:3001/save-result", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          exercice_numero: currentExo.numero,
+          exercice_categorie: currentExo.categorie,
+          correct: isCorrect,
+          duree: 0
+        }),
+      });
+    } catch (err) {
+      console.error("Erreur sauvegarde BDD:", err);
+    }
+
+    // 5. Feedback
+    setFeedback({
+      type: isCorrect ? "success" : "error",
+      message: isCorrect
+        ? "Bravo ! C'est la bonne réponse. ✅"
+        : `Dommage. La réponse attendue était ${expected}. ❌`,
+      correction: replaceVariables(currentExo.correction, variables)
+    });
+  };
+
   return (
     <div className="container" style={{ textAlign: "center", marginTop: "5vh" }}>
       <h1>Bonjour {user} ! 👋</h1>
@@ -142,18 +174,20 @@ function Home({ user }) {
       ) : (
         <div className="exo-card" style={{ marginTop: "2rem", padding: "30px", border: "2px solid #6c5ce7", borderRadius: "15px", textAlign: "left", backgroundColor: "white" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-             <span className="badge">Cible : {currentExo.automatisme}</span>
-             <button onClick={fetchRecommendation} className="refresh-btn">🔄 Autre exercice</button>
+            <span className="badge">Cible : {currentExo.automatisme}</span>
+            <button onClick={fetchRecommendation} className="refresh-btn">🔄 Autre exercice</button>
           </div>
-          
+
           <h3 style={{ color: "#2d3436" }}>Exercice n°{currentExo.numero}</h3>
+          
           <div style={{ fontSize: "1.2rem", margin: "20px 0" }}>
-  <MethodeContent text={replaceVars(currentExo.enonce, variables)} />
-</div>
+            {/* CORRECTION : Utilisation du bon nom de fonction replaceVariables */}
+            <MethodeContent text={replaceVariables(currentExo.enonce, variables)} />
+          </div>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={userAnswer}
               onChange={(e) => setUserAnswer(e.target.value)}
               placeholder="Ta réponse..."
@@ -166,17 +200,17 @@ function Home({ user }) {
           </form>
 
           {feedback && (
-            <div style={{ 
-              padding: "15px", 
-              borderRadius: "8px", 
+            <div style={{
+              padding: "15px",
+              borderRadius: "8px",
               backgroundColor: feedback.type === 'success' ? '#dff9fb' : '#ffeaed',
               borderLeft: `5px solid ${feedback.type === 'success' ? '#22a6b3' : '#eb4d4b'}`
             }}>
               <p style={{ fontWeight: "bold", margin: 0 }}>{feedback.message}</p>
-             <div style={{ marginTop: "10px", fontSize: "0.95rem", fontStyle: "italic" }}>
-  <strong>Explication :</strong>
-  <MethodeContent text={feedback.correction} />
-</div>
+              <div style={{ marginTop: "10px", fontSize: "0.95rem", fontStyle: "italic" }}>
+                <strong>Explication :</strong>
+                <MethodeContent text={feedback.correction} />
+              </div>
             </div>
           )}
         </div>
