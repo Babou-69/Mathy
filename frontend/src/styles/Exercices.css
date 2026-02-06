@@ -39,9 +39,8 @@ body {
   border-radius: 20px;
   padding: 2rem;
   width: 100%;
-  max-width: 600px; /* Un peu plus large pour les boutons catégories */
+  max-width: 900px;
   box-shadow: 8px 8px 0px var(--yellow-accent);
-  position: relative;
   text-align: center;
   margin-bottom: 3rem;
 }
@@ -135,8 +134,8 @@ body {
   font-size: 1.2rem;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 1.5rem;
 }
+
 
 /* INPUT & BOUTON */
 .input-group {
@@ -273,3 +272,54 @@ body {
   text-overflow: ellipsis;
   pointer-events: none; /* le texte n’est pas cliquable */
 }
+
+/* --- ONGLET EXERCICES --- */
+
+.methodes-tabs {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.exercice-tab {
+  background: var(--white);
+  border: 2px solid var(--purple-light);
+  color: var(--purple-dark);
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  box-shadow: 2px 2px 0 var(--yellow-accent);
+}
+
+.exercice-tab:hover {
+  background: var(--yellow-light);
+  transform: translateY(-2px);
+  border-color: var(--yellow-accent);
+}
+
+.exercice-tab.active {
+  background: var(--purple-main);
+  color: white;
+  border-color: var(--purple-main);
+  box-shadow: 3px 3px 0 var(--yellow-accent);
+}
+
+.method-link-btn{
+  background: var(--white);
+  border: 2px solid var(--purple-light);
+  color: var(--purple-dark);
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  box-shadow: 2px 2px 0 var(--yellow-accent);
+}
+

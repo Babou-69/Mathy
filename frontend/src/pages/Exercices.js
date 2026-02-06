@@ -347,7 +347,7 @@ useEffect(() => {
           {exercicesBDD.map((_, i) => (
             <button
               key={i}
-              className={indexExercice === i ? "active" : ""}
+              className={`exercice-tab ${indexExercice === i ? "active" : ""}`}
               onClick={() => selectExercice(i)}
             >
               Exercice {i + 1}
@@ -355,7 +355,7 @@ useEffect(() => {
           ))}
         </div>
       )}
-
+      
       {/* Énoncé */}
       {enonceFinal && (
   <div className="exercise-area">
