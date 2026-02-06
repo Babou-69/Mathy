@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Methode from "./pages/Methode";
@@ -12,6 +12,21 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(localStorage.getItem("user"));
 
+  // Vérification automatique au démarrage
+  useEffect(() => {
+    if (token) {
+      fetch("http://localhost:3001/verify-token", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        if (res.status === 401 || res.status === 403) {
+          handleLogout();
+        }
+      })
+      .catch(() => handleLogout());
+    }
+  }, [token]);
+
   const handleLogin = (username) => {
     const storedToken = localStorage.getItem("token");
     setToken(storedToken);
@@ -20,59 +35,29 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setToken(null);
     setUser(null);
   };
 
   const RequireAuth = ({ children }) => {
-    if (!token) {
-      return <Navigate to="/login" replace />;
-    }
+    if (!token) return <Navigate to="/login" replace />;
     return children;
   };
 
   return (
     <Router>
       {token && <Navbar onLogout={handleLogout} user={user} />}
-
       <Routes>
-        {/* 🔁 Redirection par défaut */}
-        <Route path="/" element={user ? <Home user={user} /> : <Navigate to="/login" />} />
-
-        {/* 🔓 Routes publiques */}
+        <Route path="/" element={token ? <Home user={user} /> : <Navigate to="/login" />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register onRegister={handleLogin} />} />
-
-        {/* 🔐 Routes protégées */}
-        <Route
-          path="/exercices"
-          element={
-            <RequireAuth>
-              <Exercices />
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/stats"
-          element={
-            <RequireAuth>
-              <Stats user={user} />
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/methodes"
-          element={
-            <RequireAuth>
-              <Methode />
-            </RequireAuth>
-          }
-        />
-
-        {/* ❌ Toute autre URL */}
+        
+        <Route path="/exercices" element={<RequireAuth><Exercices user={user} /></RequireAuth>} />
+        <Route path="/stats" element={<RequireAuth><Stats user={user} /></RequireAuth>} />
+        <Route path="/methodes" element={<RequireAuth><Methode /></RequireAuth>} />
+        
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

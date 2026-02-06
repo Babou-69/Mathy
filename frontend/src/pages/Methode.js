@@ -80,32 +80,34 @@ function Methode() {
     setContenu("");
   };
 
-  const handleMethodeChange = async (methode) => {
+  // ... (imports et constantes)
+const handleMethodeChange = async (methode) => {
     setSelectedMethode(methode);
-    setMethodesBDD([]);
-    setIndexMethode(0);
-    setContenu("");
-
     if (!methode) return;
 
     try {
-      const res = await fetch(
-        `http://localhost:3001/methode/${encodeURIComponent(methode)}`,
-        {
-          headers: {
-            Authorization: "Bearer " + localStorage.getItem("token")
-          }
-        }
-      );
+        const res = await fetch(
+            `http://localhost:3001/methode/${encodeURIComponent(methode)}`,
+            {
+                headers: {
+                    Authorization: "Bearer " + localStorage.getItem("token")
+                }
+            }
+        );
 
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setMethodesBDD(data);
-      afficherMethode(data, 0, methode);
+        if (res.status === 401 || res.status === 403) {
+            localStorage.clear();
+            navigate("/login");
+            return;
+        }
+
+        const data = await res.json();
+        setMethodesBDD(data);
+        afficherMethode(data, 0, methode);
     } catch {
-      setContenu("❌ Méthode introuvable.");
+        setContenu("❌ Méthode introuvable.");
     }
-  };
+};
 
   const afficherMethode = (list, index, automatisme) => {
     const m = list[index];

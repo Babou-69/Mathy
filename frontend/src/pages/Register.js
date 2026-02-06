@@ -34,31 +34,33 @@ function Register({ onRegister }) {
     generateRandomUser();
   }, []);
 
-  const handleSubmit = async (e) => {
+  // ... (imports et listes)
+const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    localStorage.clear();
 
     try {
-      const res = await fetch("http://localhost:3001/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user, password }),
-      });
+        const res = await fetch("http://localhost:3001/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user, password }),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            setError(data.error || "Erreur lors de l'inscription");
+            return;
+        }
 
-      if (!res.ok) {
-        // Si l'identifiant est déjà pris, le serveur renverra une erreur 400
-        setError(data.error || "Erreur lors de l'inscription");
-        return;
-      }
-
-      onRegister(user);
-      navigate("/");
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", user);
+        onRegister(user);
+        navigate("/");
     } catch (err) {
-      setError("Impossible de se connecter au serveur");
+        setError("Erreur serveur");
     }
-  };
+};
 
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>

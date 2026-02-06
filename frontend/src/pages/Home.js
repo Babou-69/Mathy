@@ -11,6 +11,11 @@ function Home({ user }) {
   const [userAnswer, setUserAnswer] = useState("");
   const [feedback, setFeedback] = useState(null);
 
+  const logout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
+
   /* =========================
      FONCTIONS UTILITAIRES
   ========================= */
@@ -89,7 +94,8 @@ function Home({ user }) {
      ACTIONS
   ========================= */
 
-  const fetchRecommendation = async () => {
+
+ const fetchRecommendation = async () => {
     setLoading(true);
     setFeedback(null);
     setUserAnswer("");
@@ -99,21 +105,23 @@ function Home({ user }) {
       const res = await fetch("http://localhost:3001/recommend-exercise", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
+      
+      if (res.status === 401 || res.status === 403) return logout();
 
+      const data = await res.json();
       if (data.automatisme) {
         const resExos = await fetch(`http://localhost:3001/exercices/${encodeURIComponent(data.automatisme)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (resExos.status === 401) return logout();
+        
         const exos = await resExos.json();
         const exo = exos[Math.floor(Math.random() * exos.length)];
-
-        const vals = generateVariables(exo);
         setCurrentExo(exo);
-        setVariables(vals);
+        setVariables(generateVariables(exo));
       }
     } catch (err) {
-      console.error("Erreur recommandation:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -122,19 +130,12 @@ function Home({ user }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem("token");
-
-    // 1. Calcul attendu
     const expected = evaluateExpression(currentExo.reponse_expr, variables);
-    
-    // 2. Réponse utilisateur
     const userVal = parseUserAnswer(userAnswer);
-
-    // 3. Comparaison avec tolérance
     const isCorrect = !isNaN(userVal) && expected !== null && Math.abs(userVal - expected) < 0.01;
 
-    // 4. Sauvegarde BDD
     try {
-      await fetch("http://localhost:3001/save-result", {
+      const res = await fetch("http://localhost:3001/save-result", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -147,16 +148,14 @@ function Home({ user }) {
           duree: 0
         }),
       });
+      if (res.status === 401) return logout();
     } catch (err) {
-      console.error("Erreur sauvegarde BDD:", err);
+      console.error(err);
     }
 
-    // 5. Feedback
     setFeedback({
       type: isCorrect ? "success" : "error",
-      message: isCorrect
-        ? "Bravo ! C'est la bonne réponse. ✅"
-        : `Dommage. La réponse attendue était ${expected}. ❌`,
+      message: isCorrect ? "Bravo ! ✅" : `Faux. La réponse était ${expected}. ❌`,
       correction: replaceVariables(currentExo.correction, variables)
     });
   };

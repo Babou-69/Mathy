@@ -24,54 +24,53 @@ function Stats({ user }) {
 
   const pdfRef = useRef();
 
-  useEffect(() => {
+  // ... (imports)
+useEffect(() => {
     if (!user) return;
-
     const token = localStorage.getItem("token");
 
     fetch("http://localhost:3001/stats", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+        headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("Non autorisé");
-        return res.json();
-      })
-      .then((data) => {
-        if (!data || data.length === 0) {
-          setStats([]);
-          setGlobalData({ total: 0, correct: 0 });
-          return;
+    .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+            localStorage.clear();
+            window.location.href = "/login"; // Force le reload
+            return;
         }
+        return res.json();
+    })
+    .then((data) => {
+  if (!data || data.length === 0) {
+    setStats([]);
+    setGlobalData({ total: 0, correct: 0 });
+    return;
+  }
 
-        // Mapping catégories (si numériques)
-        const CATEGORY_LABELS = {
-          1: "Calcul numérique et algébrique",
-          2: "Proportions et pourcentages",
-          3: "Évolutions et variations",
-        };
+  // On définit les labels de manière robuste
+  const CATEGORY_LABELS = {
+    1: "Proportions et pourcentages",
+    2: "Évolutions et variations",
+    3: "Calcul numérique et algébrique",
+  };
 
-        const formatted = data.map((d) => ({
-          category:
-            CATEGORY_LABELS[d.category] || `Catégorie ${d.category}`,
-          total: d.total || 0,
-          correct: d.correct || 0,
-          rate: d.rate || 0,
-        }));
+  const formatted = data.map((d) => ({
+    // On s'assure que d.category est traité comme une clé (nombre ou string)
+    category: CATEGORY_LABELS[d.category] || `Catégorie ${d.category}`,
+    total: Number(d.total) || 0,
+    correct: Number(d.correct) || 0,
+    rate: Number(d.rate) || 0,
+  }));
 
-        setStats(formatted);
+  console.log("Données formatées pour Recharts :", formatted); // Vérifie la console du navigateur
+  setStats(formatted);
 
-        const total = formatted.reduce((a, c) => a + c.total, 0);
-        const correct = formatted.reduce((a, c) => a + c.correct, 0);
-
-        setGlobalData({ total, correct });
-      })
-      .catch((err) => {
-        console.error("Erreur fetch stats :", err);
-        setMessage("Impossible de charger les statistiques.");
-      });
-  }, [user]);
+  const total = formatted.reduce((a, c) => a + c.total, 0);
+  const correct = formatted.reduce((a, c) => a + c.correct, 0);
+  setGlobalData({ total, correct });
+})
+    .catch(() => setMessage("Erreur de connexion aux statistiques."));
+}, [user]);
 
   const COLORS = [
     "#4caf50",

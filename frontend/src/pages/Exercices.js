@@ -150,22 +150,29 @@ const autoFromUrl = searchParams.get("automatisme");
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  /* --- Chargement catégories / automatismes --- */
+  const checkAuth = (res) => {
+    if (res.status === 401 || res.status === 403) {
+      localStorage.clear();
+      navigate("/login");
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     fetch("http://localhost:3001/automatismes", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
-        if (!res.ok) throw new Error("Non autorisé");
+        if (!checkAuth(res)) return;
         return res.json();
       })
       .then((data) => {
-        setCategories(Object.keys(data));
-        setAutomatismesMap(data);
-      })
-      .catch((err) =>
-        console.error("Erreur chargement des automatismes :", err)
-      );
+        if (data) {
+          setCategories(Object.keys(data));
+          setAutomatismesMap(data);
+        }
+      });
   }, [token]);
 
   /* --- Gestion de la redirection via URL (?automatisme=...) --- */

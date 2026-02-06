@@ -48,21 +48,29 @@ db.serialize(() => {
 });
 
 // ===== JWT MIDDLEWARE =====
+// Remplace ton middleware authJWT par celui-ci (plus robuste) :
 const authJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: "Token manquant" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Token manquant ou format invalide" });
   }
 
   const token = authHeader.split(" ")[1];
+  
+  // Correction ici : on utilise uniquement la constante JWT_SECRET
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(401).json({ error: "Token invalide" });
+      return res.status(401).json({ error: "Session expirée, veuillez vous reconnecter" });
     }
-    req.user = decoded; // { id, identifiant }
+    req.user = decoded;
     next();
   });
 };
+
+// Ajoute bien la route de vérification pour App.js
+app.get("/verify-token", authJWT, (req, res) => {
+  res.json({ valid: true, user: req.user.identifiant });
+});
 
 // ===== NORMALIZE =====
 const normalize = (str) =>
@@ -327,6 +335,17 @@ app.post("/save-result", authJWT, (req, res) => {
   );
 });
 
+// ... (reste du code inchangé)
+
+// ===== VERIFY TOKEN (Nouveau) =====
+app.get("/verify-token", authJWT, (req, res) => {
+  // Si le middleware authJWT passe, le token est valide
+  res.json({ valid: true, user: req.user.identifiant });
+});
+
+app.listen(PORT, () => {
+  console.log("✅ Serveur JWT lancé sur http://localhost:" + PORT);
+});
 
 app.listen(PORT, () => {
   console.log("✅ Serveur JWT lancé sur http://localhost:" + PORT);

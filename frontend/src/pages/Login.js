@@ -8,43 +8,33 @@ function Login({ onLogin }) {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  // ... (imports)
+const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    localStorage.clear(); // 🧹 On nettoie avant toute tentative
 
     try {
-      const res = await fetch("http://localhost:3001/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user, password }),
-      });
+        const res = await fetch("http://localhost:3001/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user, password }),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            setError(data.error || "Erreur de connexion");
+            return;
+        }
 
-      if (!res.ok) {
-        setError(data.error || "Erreur de connexion");
-        return;
-      }
-
-      if (!data.token) {
-        setError("Token manquant");
-        return;
-      }
-
-      // ✅ stockage JWT
-      localStorage.setItem("token", data.token);
-
-      // ✅ on garde juste l'identifiant côté front
-      onLogin(user);
-
-      // ✅ redirection
-      navigate("/exercices");
-
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", data.user); // On stocke l'user ici aussi
+        onLogin(data.user);
+        navigate("/"); // Redirection vers l'accueil
     } catch (err) {
-      console.error(err);
-      setError("Impossible de se connecter au serveur");
+        setError("Impossible de se connecter au serveur");
     }
-  };
+};
 
   return (
   <div
