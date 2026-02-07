@@ -53,9 +53,9 @@ function Stats({ user }) {
         }
 
         const CATEGORY_LABELS = {
-          1: "Calcul numérique et algébrique",
-          2: "Proportions et pourcentages",
-          3: "Évolutions et variations",
+          1: "Proportions et pourcentages",
+          2: "Évolutions et variations",
+          3: "Calcul numérique et algébrique",
         };
 
         const formatted = data.map((d) => ({
